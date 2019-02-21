@@ -17,10 +17,10 @@
     CASServer 负责完成对用户的认证工作 , 需要独立部署 , CAS Server 会处理用户名 /密码等凭证 (Credentials) 。
 
  * ### CAS 客户端
-    负责处理对客户端受保护资源的访问请求，需要对请求方进行身份认证时，重定向到 CAS Server 进行认证。（原则上，客户端应用不再接受任何的用户名密码等 Credentials ）。
-
- * ### CASClient 
-    与受保护的客户端应用部署在一起，以 Filter 方式保护受保护的资源。
+    负责处理对客户端受保护资源的访问请求，需要对请求方进行身份认证时，重定向到 CAS Server 进行认证。（原则上，客户端应用不再接受任何的用户名密码等 Credentials ）。CAS Client 与受保护的客户端应用部署在一起，以 Filter 方式保护受保护的资源。
+    
+## 本代理作用 
+   完成CAS Client的校验动作，成功后代理至后端服务，避免每个后端服务都需要集成CAS Client
 
 ## CAS Web流程
 ![](img/flow-spec.png)
