@@ -1,5 +1,5 @@
 ## CAS基本协议流程
-![](../img/base-protocol.png)
+![](img/base-protocol.png)
 ## 名词
  * ### Ticket Grangting Ticket(TGT) ：
    
@@ -23,7 +23,7 @@
     与受保护的客户端应用部署在一起，以 Filter 方式保护受保护的资源。
 
 ## CAS Web流程
-![](../img/flow-spec.png)
+![](img/flow-spec.png)
 
 
 
