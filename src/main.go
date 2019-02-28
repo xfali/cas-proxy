@@ -19,13 +19,17 @@ import (
     "fmt"
     "log"
     "net/http"
+    "sync"
 )
 
 var globalSessions *session.Manager
+var sessionidMap map[string]string
+var globalLock sync.Mutex
 
 func init() {
     session.Register("memory", memory.New())
-    globalSessions, _ = session.NewSessionManager("memory", "GOSESSIONID", 3600)
+    globalSessions, _ = session.NewSessionManager("memory", "JSESSIONID", 3600)
+    sessionidMap = map[string]string{}
     go globalSessions.GC()
 }
 
@@ -34,6 +38,7 @@ func main() {
     remoteAddr := flag.String("h", "localhost", "代理的后端服务地址")
     port := flag.String("p", "12345", "代理运行端口号")
     casServer := flag.String("s", "localhost", "CAS-Server地址")
+    path := flag.String("e", "/", "入口地址")
 
     flag.Parse()
 
@@ -44,31 +49,37 @@ func main() {
     fmt.Printf("port: %s\n", *port)
     fmt.Printf("cas-server addr: %s\n", *casServer)
 
-    http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-        check := true
-        cookie, err := req.Cookie("JSESSIONID")
-        if err != nil {
-            check = false
-        }
-        if check {
-            sess := globalSessions.SessionStart(w, req)
-            token := sess.Get(cookie.Value)
-            if token == nil {
-                check = false
-            } else {
+    http.HandleFunc(*path, func(w http.ResponseWriter, req *http.Request) {
+        session := globalSessions.TryGetSession(w, req)
+        if session != nil {
+            token := session.Get("token")
+            if token != nil {
                 //success
                 proxy.DoProxy(*remoteAddr, token.(string), w, req)
+                return
             }
         }
 
-        if !check && cas.IsAuthentication(w, req, *casServer) {
-            http.SetCookie(w, &http.Cookie{
-                Name:  "JSESSIONID",
-                Value: "fake_id",
-            })
+        //check logout request
+        if st, logout := cas.CheckLogout(req); logout {
+            globalLock.Lock()
+            if value, ok := sessionidMap[st]; ok {
+                globalSessions.TryDestroySession(value)
+                delete(sessionidMap, st)
+            }
+            globalLock.Unlock()
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+
+        if cas.IsAuthentication(w, req, *casServer) {
             sess := globalSessions.SessionStart(w, req)
-            sess.Set("fake_id", "TGC")
-            http.Redirect(w, req, cas.ServiceUrl(req), http.StatusFound)
+            url, ticket := cas.SeparateServiceUrlTicket(req)
+            globalLock.Lock()
+            sessionidMap[ticket] = sess.SessionID()
+            globalLock.Unlock()
+            sess.Set("token", "xx")
+            http.Redirect(w, req, url, http.StatusFound)
         }
     })
     err = http.ListenAndServe(":"+*port, nil)

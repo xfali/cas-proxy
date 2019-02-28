@@ -85,6 +85,26 @@ func (manager *Manager) SessionStart(w http.ResponseWriter, r *http.Request) (se
     }
     return session
 }
+
+func (manager *Manager) TryGetSession(w http.ResponseWriter, r *http.Request) (session Session) {
+    manager.lock.Lock()
+    defer manager.lock.Unlock()
+    cookie, err := r.Cookie(manager.cookieName)
+    if err != nil || cookie.Value == "" {
+        return nil
+    } else {
+        sid, _ := url.QueryUnescape(cookie.Value)
+        session, _ = manager.provider.SessionRead(sid)
+    }
+    return session
+}
+
+func (manager *Manager) TryDestroySession(sessid string) {
+    manager.lock.Lock()
+    defer manager.lock.Unlock()
+    manager.provider.SessionDestroy(sessid)
+}
+
 func (manager *Manager) SessionDestroy(w http.ResponseWriter, r *http.Request) {
     cookie, err := r.Cookie(manager.cookieName)
     if err != nil || cookie.Value == "" {

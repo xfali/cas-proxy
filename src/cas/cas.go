@@ -11,10 +11,35 @@
 package cas
 
 import (
+    "io"
     "io/ioutil"
     "net/http"
     "strings"
 )
+
+const (
+    LogoutRequest = "samlp:LogoutRequest"
+    SesssionIDStart = "<samlp:SessionIndex>"
+    SesssionIDEnd = "</samlp:SessionIndex>"
+)
+
+func CheckLogout(req *http.Request) (string, bool) {
+    if req.Method == http.MethodPost {
+        body := make([]byte, 0)
+        data, err := io.ReadFull(req.Body, body)
+        if err != nil {
+            return "", false
+        }
+        dataStr := string(data)
+        if strings.Contains(dataStr, LogoutRequest) {
+            start := strings.Index(dataStr, SesssionIDStart)
+            end := strings.Index(dataStr, SesssionIDEnd)
+            ST := dataStr[start+len(SesssionIDStart): end]
+            return ST, true
+        }
+    }
+    return "", false
+}
 
 /*
 判断当前访问是否已认证
@@ -67,35 +92,38 @@ func validateTicket(localUrl, casServerUrl string) bool {
 /*
 从请求中获取访问路径
  */
-func ServiceUrl(r *http.Request) string {
+func SeparateServiceUrlTicket(r *http.Request) (string, string) {
     scheme := "http://"
     if r.TLS != nil {
         scheme = "https://"
     }
     url := strings.Join([]string{scheme, r.Host, r.RequestURI}, "")
     slice := strings.Split(url, "?")
+    var ticket string
     if len(slice) > 1 {
         localUrl := slice[0]
-        urlParamStr := removeTicketParam(slice[1])
+        urlParamStr, t := separateTicketParam(slice[1])
+        ticket = t
         url = localUrl + "?" + urlParamStr
     }
-    return url
+    return url, ticket
 }
 
 /*
 处理并确保路径中只有一个ticket参数
  */
-func removeTicketParam(urlParams string) string {
+func separateTicketParam(urlParams string) (string, string) {
     if len(urlParams) == 0 || !strings.Contains(urlParams, "ticket") {
-        return urlParams
+        return urlParams, ""
     }
 
     sep := "&"
     params := strings.Split(urlParams, sep)
-
+    var ticket string
     newParams := ""
     for _, value := range params {
         if strings.Contains(value, "ticket") {
+            ticket= strings.Split(value, "=")[1]
             continue
         }
 
@@ -109,7 +137,7 @@ func removeTicketParam(urlParams string) string {
             }
         }
     }
-    return newParams
+    return newParams, ticket
 }
 
 /*
