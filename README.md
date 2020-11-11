@@ -1,3 +1,11 @@
+# CAS Proxy
+完成CAS client与CAS server的交互及校验工作，代理后端服务。
+
+## 安装
+```
+go get github.com/xfali/cas-proxy/cmd/casproxy
+```
+
 ## CAS基本协议流程
 ![](img/base-protocol.png)
 ## 名词
