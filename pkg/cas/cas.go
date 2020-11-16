@@ -11,9 +11,11 @@
 package cas
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -62,7 +64,11 @@ func IsAuthentication(w http.ResponseWriter, r *http.Request, casServerUrl strin
 重定向到CAS认证中心
 */
 func redirectToCasServer(w http.ResponseWriter, r *http.Request, casServerUrl string) {
-	casServerUrl = casServerUrl + "/login?service=" + getLocalUrl(r)
+	service, ticket := SeparateServiceUrlTicket(r)
+	if ticket != "" {
+		ticket = "&ticket=" + ticket
+	}
+	casServerUrl = fmt.Sprintf("%s/login?service=%s%s", casServerUrl, url.QueryEscape(service), ticket)
 	http.Redirect(w, r, casServerUrl, http.StatusFound)
 }
 
@@ -70,7 +76,8 @@ func redirectToCasServer(w http.ResponseWriter, r *http.Request, casServerUrl st
 验证访问路径中的ticket是否有效
 */
 func validateTicket(localUrl, casServerUrl string) bool {
-	casServerUrl = casServerUrl + "/serviceValidate?service=" + localUrl
+	service, ticket := separateTicketParam(localUrl)
+	casServerUrl = fmt.Sprintf("%s/serviceValidate?service=%s&ticket=%s", casServerUrl, url.QueryEscape(service), ticket)
 	res, err := http.Get(casServerUrl)
 	if err != nil {
 		return false
